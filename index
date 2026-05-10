@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>フライトダッシュ！</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1923;
+  --panel: #1a2535;
+  --border: #2a3a50;
+  --accent: #00b4d8;
+  --gold: #ffd60a;
+  --green: #06d6a0;
+  --red: #ef233c;
+  --orange: #fb8500;
+  --text: #e8f4f8;
+  --muted: #6b8fa8;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans JP', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+
+/* ===== メインラッパー ===== */
+#app {
+  width: 420px;
+  height: 100vh;
+  max-height: 750px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  box-shadow: 0 0 80px rgba(0,180,216,0.15);
+}
+
+/* ===== 共通スクリーン ===== */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+}
+.screen.active { display: flex; }
+
+/* ===== タイトル ===== */
+#titleScreen {
+  background: linear-gradient(160deg, #0f1923 0%, #0a1628 50%, #0f2040 100%);
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.title-plane {
+  font-size: 80px;
+  animation: planeFly 3s ease-in-out infinite;
+  margin-bottom: 8px;
+}
+@keyframes planeFly {
+  0%,100% { transform: translateY(0) rotate(-5deg); }
+  50% { transform: translateY(-12px) rotate(-2deg); }
+}
+.title-logo {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 36px;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 30px rgba(0,180,216,0.6);
+  margin-bottom: 6px;
+}
+.title-sub {
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  margin-bottom: 36px;
+}
+.title-desc {
+  background: rgba(0,180,216,0.08);
+  border: 1px solid rgba(0,180,216,0.2);
+  border-radius: 16px;
+  padding: 16px 24px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--muted);
+  text-align: center;
+  margin: 0 24px 32px;
+  max-width: 320px;
+}
+.title-desc strong { color: var(--accent); }
+.btn-start {
+  background: linear-gradient(135deg, #00b4d8, #0077b6);
+  border: none;
+  border-radius: 50px;
+  padding: 16px 52px;
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 20px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 30px rgba(0,180,216,0.4);
+  letter-spacing: 0.08em;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn-start:active { transform: scale(0.94); box-shadow: 0 0 15px rgba(0,180,216,0.3); }
+
+/* ===== HUD（上部） ===== */
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 14px 18px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 50;
+  background: linear-gradient(to bottom, rgba(15,25,35,0.95), transparent);
+}
+.hud-phase {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 13px;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+}
+.hud-timer-wrap { display: flex; align-items: center; gap: 8px; }
+.hud-timer-label { font-size: 11px; color: var(--muted); letter-spacing: 0.15em; }
+#timerVal {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 32px;
+  color: var(--gold);
+  line-height: 1;
+  min-width: 48px;
+  text-align: right;
+  transition: color 0.3s;
+}
+#timerVal.danger { color: var(--red); animation: timerPulse 0.4s infinite alternate; }
+@keyframes timerPulse { from{transform:scale(1)} to{transform:scale(1.1)} }
+.hud-score {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 14px;
+  color: var(--green);
+}
+
+/* ===== 進捗バー ===== */
+#progressBar {
+  position: absolute;
+  top: 62px; left: 18px; right: 18px;
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  z-index: 50;
+}
+#progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  border-radius: 2px;
+  transition: width 0.3s;
+  width: 0%;
+}
+
+/* ===== 部屋フェーズ ===== */
+#roomScreen {
+  background: #1a1a2e;
+}
+#roomCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* ===== アイテムバー（下部） ===== */
+#itemBar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 10px 12px 16px;
+  background: linear-gradient(to top, rgba(15,25,35,0.98), transparent);
+  z-index: 50;
+  pointer-events: none;
+}
+.item-bar-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  margin-bottom: 7px;
+  text-align: center;
+}
+#itemSlots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.item-slot {
+  width: 50px; height: 50px;
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  position: relative;
+  transition: all 0.2s;
+}
+.item-slot.collected {
+  background: rgba(6,214,160,0.15);
+  border-color: var(--green);
+  animation: slotPop 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes slotPop {
+  from { transform: scale(0.6); } to { transform: scale(1); }
+}
+.item-slot .slot-check {
+  position: absolute;
+  top: -4px; right: -4px;
+  width: 14px; height: 14px;
+  background: var(--green);
+  border-radius: 50%;
+  font-size: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 900;
+}
+
+/* ===== 空港フェーズ ===== */
+#airportScreen {
+  background: var(--bg);
+  flex-direction: column;
+  align-items: stretch;
+}
+#airportCanvas {
+  flex: 1;
+  width: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* ===== 搭乗成功・失敗 ===== */
+#successScreen, #failScreen {
+  background: radial-gradient(ellipse at 50% 30%, #0a2a3a 0%, #0f1923 70%);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+}
+.result-emoji { font-size: 72px; animation: resultPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275) both; }
+@keyframes resultPop { from{transform:scale(0.2);opacity:0} to{transform:scale(1);opacity:1} }
+.result-title {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 30px;
+  letter-spacing: 0.08em;
+}
+.result-sub { font-size: 13px; color: var(--muted); letter-spacing: 0.1em; }
+
+/* ===== チェックリスト ===== */
+#checklistScreen {
+  background: var(--bg);
+  flex-direction: column;
+}
+.checklist-header {
+  padding: 20px 20px 12px;
+  background: linear-gradient(135deg, #0a1628, #0f2040);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.checklist-title {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 22px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.checklist-sub { font-size: 12px; color: var(--muted); letter-spacing: 0.1em; }
+.checklist-summary {
+  display: flex; gap: 12px; margin-top: 10px;
+}
+.cl-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.cl-badge.ok { background: rgba(6,214,160,0.2); color: var(--green); border: 1px solid var(--green); }
+.cl-badge.ng { background: rgba(239,35,60,0.2); color: var(--red); border: 1px solid var(--red); }
+
+#checklistBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+.cl-category {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+}
+.cl-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 5px;
+  border: 1px solid transparent;
+}
+.cl-item.got {
+  background: rgba(6,214,160,0.07);
+  border-color: rgba(6,214,160,0.2);
+}
+.cl-item.missed {
+  background: rgba(239,35,60,0.07);
+  border-color: rgba(239,35,60,0.2);
+  animation: missedShake 0.4s ease;
+}
+@keyframes missedShake {
+  0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)}
+}
+.cl-emoji { font-size: 24px; width: 36px; text-align: center; }
+.cl-info { flex: 1; }
+.cl-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+.cl-item.got .cl-name { color: var(--text); }
+.cl-item.missed .cl-name { color: var(--red); }
+.cl-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.cl-status {
+  font-size: 18px;
+  font-weight: 900;
+}
+.cl-item.got .cl-status { color: var(--green); }
+.cl-item.missed .cl-status { color: var(--red); }
+.cl-importance {
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.imp-must { background: rgba(239,35,60,0.25); color: var(--red); }
+.imp-need { background: rgba(251,133,0,0.25); color: var(--orange); }
+.imp-nice { background: rgba(107,143,168,0.25); color: var(--muted); }
+
+.checklist-footer {
+  padding: 14px 20px 20px;
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.btn-retry2, .btn-share {
+  flex: 1;
+  padding: 13px;
+  border-radius: 14px;
+  border: none;
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 15px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: transform 0.1s;
+}
+.btn-retry2:active, .btn-share:active { transform: scale(0.95); }
+.btn-retry2 { background: linear-gradient(135deg, var(--accent), #0077b6); color: #fff; }
+.btn-share { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+
+/* ===== ポップアップ ===== */
+/* 通常ポップ（アイテムゲット・下部小） */
+#popup {
+  position: absolute;
+  bottom: 200px;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  background: rgba(6,214,160,0.96);
+  border-radius: 16px;
+  padding: 10px 22px;
+  text-align: center;
+  z-index: 200;
+  pointer-events: none;
+  transition: transform 0.18s cubic-bezier(0.175,0.885,0.32,1.275);
+  white-space: nowrap;
+}
+#popup.show { transform: translateX(-50%) scale(1); }
+#popup .pop-emoji { font-size: 24px; }
+#popup .pop-text { font-family: 'Dela Gothic One', cursive; font-size: 14px; color: #fff; letter-spacing: 0.06em; }
+
+/* 重要ポップ（搭乗案内・中央大型） */
+#bigPopup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: linear-gradient(135deg, rgba(15,25,50,0.98), rgba(10,20,40,0.98));
+  border: 3px solid var(--gold);
+  border-radius: 24px;
+  padding: 28px 32px;
+  text-align: center;
+  z-index: 210;
+  pointer-events: none;
+  transition: transform 0.28s cubic-bezier(0.175,0.885,0.32,1.275);
+  width: 320px;
+  box-shadow: 0 0 60px rgba(255,214,10,0.3), 0 0 120px rgba(255,214,10,0.1);
+}
+#bigPopup.show { transform: translate(-50%, -50%) scale(1); }
+#bigPopup .bp-emoji { font-size: 52px; margin-bottom: 10px; }
+#bigPopup .bp-title {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 20px; color: var(--gold);
+  letter-spacing: 0.08em; margin-bottom: 10px;
+  text-shadow: 0 0 20px rgba(255,214,10,0.6);
+}
+#bigPopup .bp-body {
+  font-size: 14px; color: var(--text);
+  line-height: 1.9; letter-spacing: 0.05em;
+}
+#bigPopup .bp-body strong { color: var(--gold); }
+
+/* ===== カウントダウン ===== */
+#countdown {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 300;
+}
+#countdown.hidden { display: none; }
+#cdNum {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 120px;
+  color: var(--accent);
+  text-shadow: 0 0 60px rgba(0,180,216,0.8);
+  animation: cdPop 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes cdPop { from{transform:scale(1.8);opacity:0} to{transform:scale(1);opacity:1} }
+#cdMsg { font-size: 15px; color: rgba(255,255,255,0.5); letter-spacing: 0.25em; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- カウントダウン -->
+  <div id="countdown" class="hidden">
+    <div id="cdNum">3</div>
+    <div id="cdMsg">荷物を集めよう！</div>
+  </div>
+
+  <!-- ポップアップ -->
+  <div id="popup"><div class="pop-emoji" id="popEmoji"></div><div class="pop-text" id="popText"></div></div>
+  <div id="bigPopup">
+    <div class="bp-emoji" id="bpEmoji"></div>
+    <div class="bp-title" id="bpTitle"></div>
+    <div class="bp-body" id="bpBody"></div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" style="display:none;">
+    <div class="hud-phase" id="hudPhase">PACKING</div>
+    <div class="hud-timer-wrap">
+      <div class="hud-timer-label">残り</div>
+      <div id="timerVal">30</div>
+    </div>
+    <div class="hud-score" id="hudScore">0/12</div>
+  </div>
+  <div id="progressBar" style="display:none;"><div id="progressFill"></div></div>
+
+  <!-- アイテムバー -->
+  <div id="itemBar" style="display:none;">
+    <div class="item-bar-label">集めたもの</div>
+    <div id="itemSlots"></div>
+  </div>
+
+  <!-- タイトル -->
+  <div id="titleScreen" class="screen active">
+    <div class="title-plane">✈️</div>
+    <div class="title-logo">FLIGHT DASH！</div>
+    <div class="title-sub">海外旅行 出発体験ゲーム</div>
+    <div class="title-desc">
+      <strong>①</strong> 部屋を歩いて荷物を集めよう！<br>
+      <strong>②</strong> 空港でチェックイン→搭乗ゲートへ！<br>
+      <strong>③</strong> 旅行の持ち物リストを確認しよう！
+    </div>
+    <button class="btn-start" onclick="startGame()">出発する ✈️</button>
+  </div>
+
+  <!-- 部屋フェーズ -->
+  <div id="roomScreen" class="screen">
+    <canvas id="roomCanvas"></canvas>
+  </div>
+
+  <!-- 空港フェーズ -->
+  <div id="airportScreen" class="screen">
+    <canvas id="airportCanvas"></canvas>
+  </div>
+
+  <!-- 成功 -->
+  <div id="successScreen" class="screen">
+    <div class="result-emoji">🛫</div>
+    <div class="result-title" style="color:var(--green)">搭乗成功！</div>
+    <div class="result-sub">フライトに間に合いました！</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:4px;" id="successMsg"></div>
+  </div>
+
+  <!-- 失敗 -->
+  <div id="failScreen" class="screen">
+    <div class="result-emoji">😱</div>
+    <div class="result-title" style="color:var(--red)">搭乗できず…</div>
+    <div class="result-sub" id="failMsg">時間切れで乗り遅れました</div>
+  </div>
+
+  <!-- チェックリスト -->
+  <div id="checklistScreen" class="screen">
+    <div class="checklist-header">
+      <div class="checklist-title">✈️ 海外旅行の持ち物リスト</div>
+      <div class="checklist-sub">今回のフライトの結果</div>
+      <div class="checklist-summary">
+        <div class="cl-badge ok" id="clOkBadge">✓ 持った: 0個</div>
+        <div class="cl-badge ng" id="clNgBadge">✗ 忘れた: 0個</div>
+      </div>
+    </div>
+    <div id="checklistBody"></div>
+    <div class="checklist-footer">
+      <button class="btn-retry2" onclick="startGame()">もう一度！</button>
+      <button class="btn-share" onclick="showTitle()">タイトルへ</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =============================================
+// 設定
+// =============================================
+const app = document.getElementById('app');
+const W = 420;
+let H = app.clientHeight || 680;
+
+// =============================================
+// アイテム定義（全持ち物リスト）
+// =============================================
+const ALL_ITEMS = [
+  // === 絶対必要 ===
+  { id:'passport',  emoji:'📘', name:'パスポート',        category:'必須書類', importance:'must', desc:'有効期限6ヶ月以上必要。入国審査で必ず提示します。', inRoom:true },
+  { id:'visa',      emoji:'🪪', name:'ビザ',              category:'必須書類', importance:'must', desc:'渡航先によっては事前取得必須。日本人は多くの国でビザ免除ですが必ず確認を。', inRoom:true },
+  { id:'ticket',    emoji:'🎫', name:'航空券(Eチケット)',  category:'必須書類', importance:'must', desc:'印刷またはスマホで確認。フライトの証明書類です。', inRoom:true },
+  { id:'wallet',    emoji:'👛', name:'財布・クレジットカード', category:'必須書類', importance:'must', desc:'海外でも使えるVisa/Mastercardが便利です。', inRoom:true },
+  { id:'phone',     emoji:'📱', name:'スマートフォン',     category:'必須書類', importance:'must', desc:'地図・翻訳・連絡に必須。モバイルWi-Fiも忘れずに。', inRoom:true },
+  { id:'insurance', emoji:'📋', name:'海外旅行保険証',     category:'必須書類', importance:'need', desc:'病気・盗難・賠償責任など広範囲をカバーします。', inRoom:true },
+  // === 重要 ===
+  { id:'charger',   emoji:'🔌', name:'充電器・モバイルバッテリー', category:'電子機器', importance:'need', desc:'海外の電圧・プラグ形状を確認。変換アダプタも必要な場合があります。', inRoom:true },
+  { id:'transformer',emoji:'⚡', name:'変圧器・変換プラグ', category:'電子機器', importance:'need', desc:'国によって電圧・プラグ形状が異なります。日本は100V、海外は110〜240Vが多いです。', inRoom:true },
+  { id:'clothes',   emoji:'👕', name:'着替え',             category:'衣類', importance:'need', desc:'滞在日数分＋1日分を目安に。現地の気候に合わせて選びましょう。', inRoom:true },
+  { id:'medicine',  emoji:'💊', name:'常備薬',             category:'健康', importance:'need', desc:'胃薬・頭痛薬・風邪薬など。処方薬は英文の証明書も持参を。', inRoom:true },
+  { id:'toothbrush',emoji:'🪥', name:'歯ブラシ・洗面用具', category:'衛生用品', importance:'need', desc:'機内でも使えます。液体類は100ml以下で透明袋に入れてください。', inRoom:true },
+  // === あると便利 ===
+  { id:'camera',    emoji:'📷', name:'カメラ',             category:'電子機器', importance:'nice', desc:'思い出を残そう。スマホでも代用できます。', inRoom:true },
+  { id:'earplugs',  emoji:'🎧', name:'イヤホン',           category:'機内グッズ', importance:'nice', desc:'長時間フライトで大活躍。ノイズキャンセリングがおすすめ。', inRoom:true },
+  { id:'sunglasses',emoji:'🕶️', name:'サングラス',        category:'衣類', importance:'nice', desc:'南国や高地では特に重要。UVカット機能付きを選びましょう。', inRoom:true },
+  { id:'guidebook', emoji:'📖', name:'ガイドブック・地図', category:'情報', importance:'nice', desc:'スマホの電池切れに備えて紙の地図も便利です。', inRoom:true },
+  { id:'snacks',    emoji:'🍫', name:'おやつ・非常食',     category:'機内グッズ', importance:'nice', desc:'機内食が合わないときの備え。ナッツや栄養バーがおすすめ。', inRoom:true },
+];
+
+// 部屋に配置するアイテム（inRoom:true のもの）
+const ROOM_ITEMS = ALL_ITEMS.filter(i => i.inRoom);
+
+// =============================================
+// ゲーム状態
+// =============================================
+let phase = 'title';
+let collectedIds = new Set();
+let timeLeft = 30;
+let timerInterval = null;
+let airportStep = 0; // 0=チェックイン, 1=手荷物検査, 2=搭乗ゲート, 3=機内
+let airportTimer = 0;
+let airportInterval = null;
+let playerX = 0, playerY = 0;
+let playerTargetX = 0, playerTargetY = 0;
+let playerVX = 0, playerVY = 0;
+let roomFrame = 0;
+let airFrame = 0;
+let roomAnimId = null;
+let airAnimId = null;
+let roomItemObjs = []; // 部屋内アイテムの配置
+let success = false;
+
+// =============================================
+// 画面切替
+// =============================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showTitle() { showScreen('titleScreen'); }
+
+// =============================================
+// ゲーム開始
+// =============================================
+function startGame() {
+  collectedIds = new Set();
+  timeLeft = 30;
+  airportStep = 0;
+  airportTimer = 20;
+  success = false;
+  playerX = W/2; playerY = H*0.55;
+  playerTargetX = W/2; playerTargetY = H*0.55;
+  playerVX = 0; playerVY = 0;
+
+  // HUD表示
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('progressBar').style.display = 'block';
+  document.getElementById('itemBar').style.display = 'block';
+  updateItemSlots();
+  updateHUD();
+
+  showCountdown(startRoom);
+}
+
+// =============================================
+// カウントダウン
+// =============================================
+function showCountdown(cb) {
+  const ov = document.getElementById('countdown');
+  const nm = document.getElementById('cdNum');
+  const msg = document.getElementById('cdMsg');
+  ov.classList.remove('hidden');
+  let n = 3;
+  nm.textContent = n;
+  msg.textContent = phase === 'airport' ? '空港ダッシュ！' : '荷物を集めよう！';
+  function tick() {
+    nm.style.animation = 'none'; void nm.offsetWidth; nm.style.animation = 'cdPop 0.4s cubic-bezier(0.175,0.885,0.32,1.275)';
+    n--;
+    if (n > 0) { nm.textContent = n; setTimeout(tick, 700); }
+    else {
+      nm.textContent = 'GO!';
+      nm.style.color = '#06d6a0';
+      nm.style.textShadow = '0 0 60px rgba(6,214,160,0.8)';
+      setTimeout(() => {
+        ov.classList.add('hidden');
+        nm.style.color = '';
+        nm.style.textShadow = '';
+        cb();
+      }, 600);
+    }
+  }
+  setTimeout(tick, 400);
+}
+
+// =============================================
+// アイテムスロット更新
+// =============================================
+function updateItemSlots() {
+  const sl = document.getElementById('itemSlots');
+  sl.innerHTML = '';
+  ROOM_ITEMS.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'item-slot' + (collectedIds.has(item.id) ? ' collected' : '');
+    div.innerHTML = `<span>${item.emoji}</span>`;
+    if (collectedIds.has(item.id)) {
+      div.innerHTML += `<span class="slot-check">✓</span>`;
+    }
+    sl.appendChild(div);
+  });
+}
+
+function updateHUD() {
+  document.getElementById('hudPhase').textContent = phase === 'room' ? 'PACKING' : 'BOARDING';
+  document.getElementById('timerVal').textContent = Math.ceil(timeLeft);
+  document.getElementById('timerVal').className = timeLeft <= 5 ? 'danger' : '';
+  document.getElementById('hudScore').textContent = collectedIds.size + '/' + ROOM_ITEMS.length;
+  const pct = (collectedIds.size / ROOM_ITEMS.length) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+// =============================================
+// ポップアップ
+// =============================================
+function showPopup(emoji, text, duration = 1200) {
+  document.getElementById('popEmoji').textContent = emoji;
+  document.getElementById('popText').textContent = text;
+  const el = document.getElementById('popup');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function showBigPopup(emoji, title, body, duration = 4000) {
+  document.getElementById('bpEmoji').textContent = emoji;
+  document.getElementById('bpTitle').textContent = title;
+  document.getElementById('bpBody').innerHTML = body;
+  const el = document.getElementById('bigPopup');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// =============================================
+// ===== 部屋フェーズ =====
+// =============================================
+const ROOM_CANVAS = document.getElementById('roomCanvas');
+const RC = ROOM_CANVAS.getContext('2d');
+
+function startRoom() {
+  phase = 'room';
+  showScreen('roomScreen');
+  ROOM_CANVAS.width = W;
+  ROOM_CANVAS.height = app.clientHeight || 680;
+  H = ROOM_CANVAS.height;
+
+  // アイテムを部屋に配置
+  roomItemObjs = ROOM_ITEMS.map((item, i) => {
+    // 均等に円周上に配置（重ならないように）
+    const n = ROOM_ITEMS.length;
+    const angle = (Math.PI * 2 / n) * i;
+    // 奇数インデックスは少し外側に配置して重なりを防ぐ
+    const r = i % 2 === 0 ? 130 : 160;
+    const cx = W / 2 + Math.cos(angle) * r;
+    const cy = H * 0.42 + Math.sin(angle) * r * 0.52;
+    return {
+      ...item,
+      x: Math.max(30, Math.min(W-30, cx)),
+      y: Math.max(120, Math.min(H - 155, cy)),
+      collected: false,
+      bounce: (Math.PI * 2 / n) * i,
+      scale: 1
+    };
+  });
+
+  playerX = W/2; playerY = H*0.48;
+  playerTargetX = W/2; playerTargetY = H*0.48;
+
+  // タイマー
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft -= 0.1;
+    updateHUD();
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      endRoom();
+    }
+  }, 100);
+
+  // 入力
+  ROOM_CANVAS.addEventListener('click', onRoomClick);
+  ROOM_CANVAS.addEventListener('touchstart', onRoomTouch, {passive:false});
+
+  // アニメーション
+  if (roomAnimId) cancelAnimationFrame(roomAnimId);
+  roomLoop();
+}
+
+function onRoomTouch(e) { e.preventDefault(); const r = ROOM_CANVAS.getBoundingClientRect(); const t = e.touches[0]; onRoomInput((t.clientX-r.left)*(W/r.width), (t.clientY-r.top)*(H/r.height)); }
+function onRoomClick(e) { const r = ROOM_CANVAS.getBoundingClientRect(); onRoomInput((e.clientX-r.left)*(W/r.width), (e.clientY-r.top)*(H/r.height)); }
+
+function onRoomInput(x, y) {
+  if (phase !== 'room') return;
+  playerTargetX = x; playerTargetY = y;
+  // アイテムに近いかチェック（ボブ込みのY座標で判定）
+  roomItemObjs.forEach(obj => {
+    if (obj.collected) return;
+    const bob = Math.sin(roomFrame * 0.05 + obj.bounce) * 4;
+    const dx = obj.x - x;
+    const dy = (obj.y + bob) - y;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d < 32) collectItem(obj);  // 当たり判定32px
+  });
+}
+
+function collectItem(obj) {
+  obj.collected = true;
+  collectedIds.add(obj.id);
+  obj.scale = 1.5;
+  setTimeout(() => { obj.scale = 0; }, 300);
+  showPopup(obj.emoji, obj.name + ' ゲット！');
+  updateItemSlots();
+  updateHUD();
+  // 全部集めた
+  if (collectedIds.size >= ROOM_ITEMS.length) {
+    setTimeout(endRoom, 500);
+  }
+}
+
+function roomLoop() {
+  roomFrame++;
+  RC.clearRect(0, 0, W, H);
+  drawRoom();
+  drawRoomItems();
+  drawPlayer(RC, playerX, playerY);
+  // プレイヤー移動
+  const dx = playerTargetX - playerX, dy = playerTargetY - playerY;
+  const dist = Math.hypot(dx, dy);
+  if (dist > 2) {
+    playerX += dx * 0.12;
+    playerY += dy * 0.12;
+  }
+  roomAnimId = requestAnimationFrame(roomLoop);
+}
+
+function drawRoom() {
+  // 床
+  const floorGrd = RC.createLinearGradient(0, H*0.3, 0, H);
+  floorGrd.addColorStop(0, '#2a3545');
+  floorGrd.addColorStop(1, '#1a2535');
+  RC.fillStyle = floorGrd;
+  RC.fillRect(0, 0, W, H);
+
+  // 壁
+  RC.fillStyle = '#232d3e';
+  RC.fillRect(0, 0, W, H*0.28);
+
+  // 床ライン（遠近感）
+  RC.strokeStyle = 'rgba(255,255,255,0.04)';
+  RC.lineWidth = 1;
+  const vanY = H*0.28;
+  for (let i=0; i<=8; i++) {
+    const bx = i*(W/8);
+    RC.beginPath(); RC.moveTo(W/2, vanY); RC.lineTo(bx, H); RC.stroke();
+  }
+  for (let j=1; j<=5; j++) {
+    const y = vanY + (H-vanY)*(j/5);
+    const xOff = (W/2)*(1 - j/5);
+    RC.beginPath(); RC.moveTo(xOff, y); RC.lineTo(W-xOff, y); RC.stroke();
+  }
+
+  // ベッド
+  RC.fillStyle = '#2a3a5a';
+  RC.beginPath(); RC.roundRect(20, H*0.32, 120, 70, 8); RC.fill();
+  RC.fillStyle = '#3a5070'; RC.beginPath(); RC.roundRect(20, H*0.32, 120, 20, [8,8,0,0]); RC.fill();
+  RC.fillStyle = '#f0f0f8'; RC.beginPath(); RC.roundRect(28, H*0.36, 104, 50, 6); RC.fill();
+  RC.fillStyle = '#ddd'; RC.beginPath(); RC.roundRect(30, H*0.32, 28, 20, 4); RC.fill();
+
+  // 机
+  RC.fillStyle = '#5a3a20';
+  RC.beginPath(); RC.roundRect(W-140, H*0.3, 130, 60, 6); RC.fill();
+  RC.fillStyle = '#7a5030'; RC.beginPath(); RC.roundRect(W-138, H*0.3, 130, 8, [6,6,0,0]); RC.fill();
+  // モニター
+  RC.fillStyle = '#222'; RC.beginPath(); RC.roundRect(W-120, H*0.12, 80, 55, 6); RC.fill();
+  RC.fillStyle = '#4488ff'; RC.beginPath(); RC.roundRect(W-118, H*0.13, 76, 50, 4); RC.fill();
+  RC.fillStyle = '#333'; RC.fillRect(W-88, H*0.32-2, 4, 10); RC.fillRect(W-102, H*0.36, 24, 4);
+
+  // クローゼット
+  RC.fillStyle = '#3a2a1a';
+  RC.beginPath(); RC.roundRect(20, H*0.06, 70, H*0.22, 6); RC.fill();
+  RC.fillStyle = '#4a3a2a'; RC.fillRect(23, H*0.07, 64, H*0.1);
+  RC.fillRect(23, H*0.18, 64, H*0.09);
+  RC.fillStyle = '#8a6a3a'; RC.beginPath(); RC.arc(54, H*0.12, 3, 0, Math.PI*2); RC.fill();
+  RC.beginPath(); RC.arc(54, H*0.22, 3, 0, Math.PI*2); RC.fill();
+
+  // 窓
+  RC.fillStyle = '#1a3060';
+  RC.beginPath(); RC.roundRect(W/2-50, H*0.04, 100, 60, 8); RC.fill();
+  RC.fillStyle = '#4488cc';
+  RC.beginPath(); RC.roundRect(W/2-47, H*0.06, 44, 50, 4); RC.fill();
+  RC.beginPath(); RC.roundRect(W/2+3, H*0.06, 44, 50, 4); RC.fill();
+  // 窓の星空
+  RC.fillStyle = '#fff';
+  [[W/2-30,H*0.1],[W/2-10,H*0.08],[W/2+20,H*0.12],[W/2+35,H*0.09]].forEach(([x,y]) => {
+    RC.beginPath(); RC.arc(x, y, 1.5, 0, Math.PI*2); RC.fill();
+  });
+
+  // 出口サイン
+  RC.fillStyle = '#06d6a0';
+  RC.beginPath(); RC.roundRect(W/2-30, H*0.86, 60, 24, 8); RC.fill();
+  RC.fillStyle = '#fff';
+  RC.font = 'bold 10px "Noto Sans JP"';
+  RC.textAlign = 'center';
+  RC.fillText('✈ 出発！', W/2, H*0.87+14);
+
+  // タイマー緊急時フラッシュ
+  if (timeLeft <= 5 && Math.floor(roomFrame/15)%2===0) {
+    RC.fillStyle = 'rgba(239,35,60,0.06)';
+    RC.fillRect(0, 0, W, H);
+  }
+}
+
+function drawRoomItems() {
+  roomItemObjs.forEach(obj => {
+    if (obj.collected && obj.scale <= 0) return;
+    const bob = Math.sin(roomFrame*0.05 + obj.bounce)*4;
+    const sc = obj.collected ? obj.scale : 1;
+    if (sc <= 0) return;
+
+    RC.save();
+    RC.translate(obj.x, obj.y + bob);
+    RC.scale(sc, sc);
+    RC.globalAlpha = obj.collected ? sc : 1;
+
+    // 光るリング
+    if (!obj.collected) {
+      const grd = RC.createRadialGradient(0, 0, 5, 0, 0, 32);
+      const pulse = (Math.sin(roomFrame*0.08 + obj.bounce)+1)*0.5;
+      grd.addColorStop(0, `rgba(0,180,216,${0.1+pulse*0.1})`);
+      grd.addColorStop(1, 'rgba(0,180,216,0)');
+      RC.fillStyle = grd;
+      RC.beginPath(); RC.arc(0, 0, 32, 0, Math.PI*2); RC.fill();
+    }
+
+    // アイテム背景
+    RC.fillStyle = obj.collected ? 'rgba(6,214,160,0.3)' : 'rgba(26,37,53,0.85)';
+    RC.strokeStyle = obj.collected ? '#06d6a0' : 'rgba(0,180,216,0.4)';
+    RC.lineWidth = 2;
+    RC.beginPath(); RC.arc(0, 0, 26, 0, Math.PI*2); RC.fill(); RC.stroke();
+
+    // 絵文字
+    RC.font = '22px serif';
+    RC.textAlign = 'center'; RC.textBaseline = 'middle';
+    RC.fillText(obj.emoji, 0, 1);
+
+    // 重要度バッジ
+    if (!obj.collected) {
+      const bc = obj.importance === 'must' ? '#ef233c' : obj.importance === 'need' ? '#fb8500' : '#6b8fa8';
+      RC.fillStyle = bc;
+      RC.beginPath(); RC.arc(16, -14, 6, 0, Math.PI*2); RC.fill();
+      RC.fillStyle = '#fff'; RC.font = 'bold 7px sans-serif';
+      RC.fillText(obj.importance === 'must' ? '!' : obj.importance === 'need' ? '★' : '◦', 16, -13);
+    }
+
+    RC.restore();
+  });
+}
+
+function endRoom() {
+  clearInterval(timerInterval);
+  if (roomAnimId) cancelAnimationFrame(roomAnimId);
+  ROOM_CANVAS.removeEventListener('click', onRoomClick);
+  ROOM_CANVAS.removeEventListener('touchstart', onRoomTouch);
+  phase = 'airport';
+  timeLeft = 20;
+  updateHUD();
+  showCountdown(startAirport);
+}
+
+// =============================================
+// ===== 空港フェーズ =====
+// =============================================
+const AIR_CANVAS = document.getElementById('airportCanvas');
+const AC2 = AIR_CANVAS.getContext('2d');
+let airH = 0;
+let airPlayerX = 0;
+let airPlayerY = 0;
+let airPlayerTargetX = 0;
+let gateReached = false;
+
+const STEPS = [
+  { id:'transport', emoji:'🚃', label:'移動',       desc:'電車・バスで空港へ向かおう！　タップして出発！', icon:'🚃', waitSec:0, popup:null },
+  { id:'arrival',   emoji:'🏛️', label:'空港到着',  desc:'空港に到着！　チェックインカウンターへ進もう', icon:'🛬', waitSec:0, popup:null },
+  { id:'checkin',   emoji:'🎫', label:'チェックイン', desc:'カウンターで搭乗券を受け取ろう', icon:'🏢', waitSec:0, popup:null },
+  { id:'baggage',   emoji:'🧳', label:'荷物預け入れ', desc:'大きな荷物をカウンターに預けよう（2秒かかります）', icon:'🧳', waitSec:2, popup:null },
+  { id:'security',  emoji:'🔍', label:'保安検査',   desc:'ベルト・金属を外してトレーに置こう（2秒かかります）', icon:'🔒', waitSec:2, popup:'⚠️ 搭乗の2時間前には\n保安検査を通過しましょう！' },
+  { id:'gate',      emoji:'🚪', label:'搭乗',       desc:'搭乗ゲートで搭乗券を提示しよう！', icon:'🚪', waitSec:0, popup:null },
+];
+let stepWaiting = false;
+let stepWaitTimer = 0;
+
+function startAirport() {
+  showScreen('airportScreen');
+  AIR_CANVAS.width = W;
+  airH = app.clientHeight || 680;
+  AIR_CANVAS.height = airH;
+  H = airH;
+
+  airportStep = 0;
+  gateReached = false;
+  stepWaiting = false;
+  stepWaitTimer = 0;
+  airPlayerX = W * 0.08;
+  airPlayerY = airH * 0.78;
+  airPlayerTargetX = W * 0.08;
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft -= 0.1;
+    updateHUD();
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      finishGame(false, 'タイムアウト！搭乗ゲートが閉まりました…');
+    }
+  }, 100);
+
+  AIR_CANVAS.addEventListener('click', onAirClick);
+  AIR_CANVAS.addEventListener('touchstart', onAirTouch, {passive:false});
+
+  if (airAnimId) cancelAnimationFrame(airAnimId);
+  airLoop();
+}
+
+function onAirTouch(e) { e.preventDefault(); const r = AIR_CANVAS.getBoundingClientRect(); const t = e.touches[0]; onAirInput((t.clientX-r.left)*(W/r.width), (t.clientY-r.top)*(airH/r.height)); }
+function onAirClick(e) { const r = AIR_CANVAS.getBoundingClientRect(); onAirInput((e.clientX-r.left)*(W/r.width), (e.clientY-r.top)*(airH/r.height)); }
+
+function onAirInput(x, y) {
+  if (phase !== 'airport') return;
+  if (stepWaiting) return;
+  const stepCols = 3;
+  const cellW = W / stepCols;
+  const cellH = airH * 0.5 / 2;
+  const baseY = airH * 0.25;
+  const i = airportStep;
+  const col = i % stepCols, row = Math.floor(i/stepCols);
+  const sx = cellW*col+cellW/2, sy = baseY+row*cellH+cellH/2;
+  const d = Math.hypot(sx - x, sy - y);
+  if (d < Math.min(cellW,cellH)*0.44) {
+    airPlayerTargetX = sx;
+    advanceStep();
+  } else {
+    airPlayerTargetX = x;
+  }
+}
+
+function advanceStep() {
+  if (stepWaiting) return;
+  const step = STEPS[airportStep];
+  if (step.waitSec > 0) {
+    // 待機ステップ：タイマーが終わるまで進めない
+    stepWaiting = true;
+    // ポップアップ表示
+    if (step.popup) {
+      showBigPopup('⚠️', '保安検査のポイント',
+        '<strong>搭乗の2時間前</strong>までに<br>通過しましょう！<br><br>' +
+        '🚫 液体は100ml以下・透明袋へ<br>' +
+        '💻 PCは取り出してトレーへ<br>' +
+        '👟 金属類はすべて外す',
+        4000);
+    } else {
+      showBigPopup('🧳', '荷物を預けています…', 'スタッフがお荷物を<br>受け取っています。<br>タグを受け取ったら控えておきましょう。', step.waitSec * 1000 + 500);
+    }
+    stepWaitTimer = step.waitSec;
+    const waitInterval = setInterval(() => {
+      stepWaitTimer -= 0.1;
+      if (stepWaitTimer <= 0) {
+        clearInterval(waitInterval);
+        stepWaiting = false;
+        completeStep(step);
+      }
+    }, 100);
+  } else {
+    completeStep(step);
+  }
+}
+
+function completeStep(step) {
+  // 保安検査のポップアップ（待機後に表示）
+  if (step.id === 'security') {
+    setTimeout(() => showPopup('⚠️', '搭乗は2時間前までに！', 3000), 100);
+  } else {
+    showPopup(step.emoji, step.label + ' 完了！');
+  }
+  airportStep++;
+  if (airportStep >= STEPS.length) {
+    clearInterval(timerInterval);
+    if (airAnimId) cancelAnimationFrame(airAnimId);
+    AIR_CANVAS.removeEventListener('click', onAirClick);
+    AIR_CANVAS.removeEventListener('touchstart', onAirTouch);
+    finishGame(true, '');
+  }
+}
+
+function airLoop() {
+  airFrame++;
+  AC2.clearRect(0, 0, W, airH);
+  drawAirport();
+
+  // プレイヤー移動
+  const step = STEPS[Math.min(airportStep, STEPS.length-1)];
+  const tx2 = airPlayerTargetX;
+  const dx2 = tx2 - airPlayerX;
+  if (Math.abs(dx2) > 2) airPlayerX += dx2 * 0.1;
+
+  drawPlayer(AC2, airPlayerX, airH*0.78);
+  airAnimId = requestAnimationFrame(airLoop);
+}
+
+function drawAirport() {
+  // 床
+  AC2.fillStyle = '#1e2d3d';
+  AC2.fillRect(0, 0, W, airH);
+  // タイル
+  AC2.strokeStyle = 'rgba(255,255,255,0.04)';
+  AC2.lineWidth = 1;
+  for (let x=0; x<W; x+=40) { AC2.beginPath(); AC2.moveTo(x,0); AC2.lineTo(x,airH); AC2.stroke(); }
+  for (let y=0; y<airH; y+=40) { AC2.beginPath(); AC2.moveTo(0,y); AC2.lineTo(W,y); AC2.stroke(); }
+
+  // 天井
+  AC2.fillStyle = '#2a3a50';
+  AC2.fillRect(0, 0, W, airH*0.2);
+
+  // 掲示板（フライト情報）
+  AC2.fillStyle = '#1a1a1a';
+  AC2.beginPath(); AC2.roundRect(W/2-80, airH*0.04, 160, 50, 6); AC2.fill();
+  AC2.fillStyle = '#00b4d8';
+  AC2.font = 'bold 11px "Noto Sans JP"';
+  AC2.textAlign = 'center';
+  AC2.fillText('✈ FL001 → 海外 BOARDING', W/2, airH*0.09);
+  AC2.fillStyle = '#ffd60a';
+  AC2.fillText('GATE B7   NOW BOARDING', W/2, airH*0.13);
+
+  // 通路ライン
+  AC2.strokeStyle = 'rgba(255,214,10,0.3)';
+  AC2.lineWidth = 2;
+  AC2.setLineDash([12,8]);
+  AC2.beginPath(); AC2.moveTo(W*0.04, airH*0.78); AC2.lineTo(W*0.96, airH*0.78); AC2.stroke();
+  AC2.setLineDash([]);
+
+  // ===== ステップを2列3行で描画 =====
+  const stepCols = 3, stepRows = 2;
+  const cellW = W / stepCols;
+  const cellH = airH * 0.5 / stepRows;
+  const baseY = airH * 0.25;
+  const pulse = (Math.sin(airFrame*0.1)+1)*0.5;
+
+  STEPS.forEach((step, i) => {
+    const col = i % stepCols;
+    const row = Math.floor(i / stepCols);
+    const sx = cellW * col + cellW/2;
+    const sy = baseY + row * cellH + cellH/2;
+    const done = i < airportStep;
+    const active = i === airportStep;
+    const waiting = active && stepWaiting;
+
+    // カード背景
+    const cardX = sx - cellW*0.44, cardY = sy - cellH*0.44;
+    const cardW2 = cellW*0.88, cardH2 = cellH*0.88;
+    AC2.fillStyle = done ? 'rgba(6,214,160,0.15)' : active ? 'rgba(0,180,216,0.12)' : 'rgba(42,58,80,0.6)';
+    AC2.strokeStyle = done ? '#06d6a0' : active ? '#00b4d8' : 'rgba(255,255,255,0.08)';
+    AC2.lineWidth = done||active ? 2 : 1;
+    AC2.beginPath(); AC2.roundRect(cardX, cardY, cardW2, cardH2, 12); AC2.fill(); AC2.stroke();
+
+    // 完了オーバーレイ
+    if (done) {
+      AC2.fillStyle = 'rgba(6,214,160,0.08)';
+      AC2.beginPath(); AC2.roundRect(cardX, cardY, cardW2, cardH2, 12); AC2.fill();
+    }
+
+    // アイコン（大）
+    AC2.font = `${done?24:active?28:22}px serif`;
+    AC2.textAlign = 'center'; AC2.textBaseline = 'middle';
+    AC2.globalAlpha = done ? 0.5 : 1;
+    AC2.fillText(step.icon, sx, sy - 14);
+    AC2.globalAlpha = 1;
+
+    // ラベル
+    AC2.fillStyle = done ? '#06d6a0' : active ? '#fff' : 'rgba(255,255,255,0.35)';
+    AC2.font = `bold 11px "Noto Sans JP"`;
+    AC2.textBaseline = 'alphabetic';
+    AC2.fillText(step.label, sx, sy + 8);
+
+    // ステップ番号
+    AC2.fillStyle = done ? '#06d6a0' : active ? '#00b4d8' : 'rgba(255,255,255,0.2)';
+    AC2.font = 'bold 10px sans-serif';
+    AC2.fillText('STEP ' + (i+1), sx, sy + 22);
+
+    // 完了チェック
+    if (done) {
+      AC2.fillStyle = '#06d6a0';
+      AC2.font = 'bold 18px serif';
+      AC2.fillText('✓', sx + cellW*0.3, sy - cellH*0.35);
+    }
+
+    // アクティブ時のタップ促進
+    if (active && !waiting) {
+      AC2.globalAlpha = 0.5 + pulse*0.5;
+      AC2.strokeStyle = '#00b4d8';
+      AC2.lineWidth = 2;
+      AC2.beginPath(); AC2.arc(sx, sy, Math.min(cellW,cellH)*0.38+pulse*5, 0, Math.PI*2); AC2.stroke();
+      AC2.globalAlpha = 1;
+    }
+
+    // 待機中プログレス
+    if (waiting) {
+      const prog = 1 - (stepWaitTimer / STEPS[airportStep].waitSec);
+      AC2.fillStyle = 'rgba(255,214,10,0.15)';
+      AC2.beginPath(); AC2.roundRect(cardX, cardY, cardW2, cardH2, 12); AC2.fill();
+      // バー
+      AC2.fillStyle = 'rgba(0,0,0,0.3)';
+      AC2.beginPath(); AC2.roundRect(sx-40, sy+28, 80, 8, 4); AC2.fill();
+      AC2.fillStyle = '#ffd60a';
+      AC2.beginPath(); AC2.roundRect(sx-40, sy+28, 80*prog, 8, 4); AC2.fill();
+      AC2.fillStyle = '#ffd60a';
+      AC2.font = '10px "Noto Sans JP"';
+      AC2.fillText('処理中… ' + Math.ceil(stepWaitTimer) + 's', sx, sy+50);
+    }
+  });
+
+  // ステップ間の矢印
+  for (let i=0; i<STEPS.length-1; i++) {
+    const col = i % stepCols, row = Math.floor(i/stepCols);
+    const nc = (i+1) % stepCols, nr = Math.floor((i+1)/stepCols);
+    const sx = cellW*col+cellW/2, sy2 = baseY+row*cellH+cellH/2;
+    const ex = cellW*nc+cellW/2, ey = baseY+nr*cellH+cellH/2;
+    AC2.strokeStyle = i < airportStep ? '#06d6a0' : 'rgba(255,255,255,0.12)';
+    AC2.lineWidth = 1.5;
+    AC2.setLineDash([4,4]);
+    AC2.beginPath(); AC2.moveTo(sx+cellW*0.44, sy2); AC2.lineTo(ex-cellW*0.44, ey); AC2.stroke();
+    AC2.setLineDash([]);
+  }
+
+  // 緊急フラッシュ
+  if (timeLeft <= 5 && Math.floor(airFrame/15)%2===0) {
+    AC2.fillStyle = 'rgba(239,35,60,0.07)';
+    AC2.fillRect(0, 0, W, airH);
+  }
+
+  // 説明テキスト
+  if (airportStep < STEPS.length) {
+    AC2.fillStyle = 'rgba(15,25,35,0.85)';
+    AC2.beginPath(); AC2.roundRect(W/2-120, airH*0.82, 240, 36, 10); AC2.fill();
+    AC2.fillStyle = '#fff';
+    AC2.font = '13px "Noto Sans JP"';
+    AC2.textAlign = 'center';
+    AC2.fillText(STEPS[airportStep].desc, W/2, airH*0.85);
+  }
+}
+
+// =============================================
+// プレイヤー描画（共通）
+// =============================================
+function drawPlayer(c, x, y) {
+  c.save();
+  c.translate(x, y);
+  const f = (phase === 'room' ? roomFrame : airFrame);
+  const run = Math.sin(f * 0.25) * 5;
+
+  // 体
+  c.fillStyle = '#4a90d9';
+  c.beginPath(); c.roundRect(-12, -30, 24, 28, 6); c.fill();
+  // ズボン
+  c.fillStyle = '#2a5090';
+  c.beginPath(); c.roundRect(-12, -4, 24, 16, [0,0,6,6]); c.fill();
+  // 脚
+  c.fillStyle = '#2a5090';
+  c.fillRect(-10, 10, 8, 14+run); c.fillRect(2, 10, 8, 14-run);
+  // 靴
+  c.fillStyle = '#333';
+  c.beginPath(); c.roundRect(-12, 22+run, 12, 6, 3); c.fill();
+  c.beginPath(); c.roundRect(0, 22-run, 12, 6, 3); c.fill();
+  // 頭
+  c.fillStyle = '#f5c7a0';
+  c.beginPath(); c.arc(0, -38, 14, 0, Math.PI*2); c.fill();
+  // 髪
+  c.fillStyle = '#5a3a1a';
+  c.beginPath(); c.arc(0, -46, 11, Math.PI, 0); c.fill();
+  // 目
+  c.fillStyle = '#333';
+  c.beginPath(); c.arc(-4, -38, 2, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.arc(4, -38, 2, 0, Math.PI*2); c.fill();
+  // カバン
+  c.fillStyle = '#8B4513';
+  c.beginPath(); c.roundRect(12, -28, 16, 20, 4); c.fill();
+  c.fillStyle = '#a0522d';
+  c.beginPath(); c.roundRect(14, -26, 12, 8, 3); c.fill();
+
+  c.restore();
+}
+
+// =============================================
+// ゲーム終了
+// =============================================
+function finishGame(win, failReason) {
+  clearInterval(timerInterval);
+  if (roomAnimId) cancelAnimationFrame(roomAnimId);
+  if (airAnimId) cancelAnimationFrame(airAnimId);
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('progressBar').style.display = 'none';
+  document.getElementById('itemBar').style.display = 'none';
+  success = win;
+  phase = 'result';
+
+  if (win) {
+    const missed = ROOM_ITEMS.filter(i => !collectedIds.has(i.id));
+    document.getElementById('successMsg').textContent =
+      missed.length === 0 ? '完璧！全部の荷物を持った！' :
+      `${ROOM_ITEMS.length - missed.length}個持った・${missed.length}個忘れた`;
+    showScreen('successScreen');
+  } else {
+    document.getElementById('failMsg').textContent = failReason;
+    showScreen('failScreen');
+  }
+
+  setTimeout(showChecklist, win ? 2000 : 2500);
+}
+
+// =============================================
+// チェックリスト表示
+// =============================================
+function showChecklist() {
+  showScreen('checklistScreen');
+  const got = ALL_ITEMS.filter(i => collectedIds.has(i.id));
+  const missed = ALL_ITEMS.filter(i => !collectedIds.has(i.id));
+  document.getElementById('clOkBadge').textContent = `✓ 持った: ${got.length}個`;
+  document.getElementById('clNgBadge').textContent = `✗ 忘れた: ${missed.length}個`;
+
+  // カテゴリ別に表示
+  const body = document.getElementById('checklistBody');
+  body.innerHTML = '';
+  const cats = [...new Set(ALL_ITEMS.map(i => i.category))];
+  cats.forEach(cat => {
+    const items = ALL_ITEMS.filter(i => i.category === cat);
+    const catDiv = document.createElement('div');
+    catDiv.className = 'cl-category';
+    catDiv.textContent = cat;
+    body.appendChild(catDiv);
+    items.forEach(item => {
+      const div = document.createElement('div');
+      const isGot = collectedIds.has(item.id);
+      div.className = `cl-item ${isGot ? 'got' : 'missed'}`;
+      const impLabel = { must:'必須', need:'重要', nice:'あると便利' }[item.importance];
+      const impClass = { must:'imp-must', need:'imp-need', nice:'imp-nice' }[item.importance];
+      div.innerHTML = `
+        <div class="cl-emoji">${item.emoji}</div>
+        <div class="cl-info">
+          <div class="cl-name">
+            ${item.name}
+            <span class="cl-importance ${impClass}">${impLabel}</span>
+          </div>
+          <div class="cl-desc">${item.desc}</div>
+        </div>
+        <div class="cl-status">${isGot ? '✓' : '✗'}</div>
+      `;
+      body.appendChild(div);
+    });
+  });
+}
+</script>
+</body>
+</html>
